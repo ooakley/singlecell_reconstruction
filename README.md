@@ -1,2 +1,2 @@
 # singlecell_reconstruction
- Reconstructing spatial distribution of single cell RNA seq using machine learning.
+ Reconstructing spatial distribution of single cell RNA seq data using machine learning.
