@@ -16,15 +16,15 @@ def main():
     sc_dataset = np.load('files/normalised48counts.npy')
     RCC_dataset = np.load('files/RCClandmarkvalues.npy')
     tomoseq_dataset = np.load('files/fiftybintomoseq.npy')
-    model = load_model('files/models/2019-09-10 12:39.h5')
+    model = load_model('files/models/2019-09-10 13:57.h5')
 
     # Generating RCC predictions:
     predictions_dataset = model.predict(sc_dataset)
 
     # Plotting individual cell actual + predicted RCC trace:
     fig, ax = plt.subplots()
-    ax.plot(predictions_dataset[48, :], label='Predicted')
-    ax.plot(RCC_dataset[48, :], label='Actual')
+    ax.plot(predictions_dataset[90, :], label='Predicted')
+    ax.plot(RCC_dataset[90, :], label='Actual')
     ax.set(xlabel='A/P sections', ylabel='Arbitrary correlation units',
         title='Comparing RCC and model output')
     ax.grid()
