@@ -9,18 +9,19 @@ python bin_RCC_calc.py
 import numpy as np
 from scipy.stats import spearmanr
 
+
 def main():
     """
     Loading data, generating bins and calculating RCC values.
     """
 
     # Load data:
-    sc_data = np.load('files/normalised48counts.npy')
+    sc_data = np.load('files/48seqcounts.npy')
     print('Single cell data shape:' + str(sc_data.shape))
     tomo_data = np.load('files/avgtomodata.npy')
     print('Tomo data shape:' + str(tomo_data.shape))
 
-    # Binning tomoseqdata:
+    # Binning tomoseqdata:
     fifty_section_data = []
     for i in range(50):
         k = i*2
@@ -30,14 +31,14 @@ def main():
     fifty_section_data = np.transpose(fifty_section_data)
     print('Fifty section data:' + str(fifty_section_data.shape))
 
-    # Calculating of RCC for single cell data:
+    # Calculating of RCC for single cell data:
     rcc_matrix = []
     print('Calculating RCC values for sc dataset:')
     for i in range(sc_data.shape[0]):
         sc_instance = np.squeeze(sc_data[i, :])
         rcc_instance = []
         for j in range(50):
-            rcc, _ = spearmanr(sc_instance, fifty_section_data[:,j])
+            rcc, _ = spearmanr(sc_instance, fifty_section_data[:, j])
             rcc_instance.append(rcc)
         rcc_instance = np.asarray(rcc_instance)
         rcc_matrix.append(rcc_instance)
@@ -49,6 +50,7 @@ def main():
     # Saving data to file:
     np.save('files/fiftybintomoseq.npy', fifty_section_data)
     np.save('files/RCClandmarkvalues.npy', rcc_matrix)
+
 
 if __name__ == '__main__':
     main()

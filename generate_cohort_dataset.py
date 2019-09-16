@@ -1,5 +1,5 @@
 """
-Generate subselections of RNAseq data, 
+Generate subselections of RNAseq data,
 convert to numpy and save locally to files.
 
 Generate 50 section bins of avgTomoSeq data.
@@ -10,12 +10,13 @@ python generate_cohort_dataset.py 20
 import os
 import random
 import argparse
-import pandas
 import numpy as np
+
 
 def main():
     # Parsing arguments:
-    parser = argparse.ArgumentParser(description='Script to generate population subselections dataset.')
+    parser = argparse.ArgumentParser(
+        description='Script to generate population subselections dataset.')
     parser.add_argument('size', type=int, help='Size of resultant dataset.')
     args = parser.parse_args()
 
@@ -23,11 +24,10 @@ def main():
     np.random.seed(seed=10)
     random.seed(10)
 
-    # Importing data:
+    # Importing data:
     sc_array = np.load('files/normalised48counts.npy')
-    tomo_array = np.load('avgtomodata.npy')
 
-    # Generating subselections:
+    # Generating subselections:
     dataset = []
     for dummy_iterator in range(args.size):
         selection_indices = random.sample(range(6189), 1000)
@@ -36,13 +36,11 @@ def main():
     dataset = np.stack(dataset, axis=0)
     print(dataset.shape)
 
-    # Binning:
-    
-
-    # Saving to file:
+    # Saving to file:
     if not os.path.exists('files/'):
         os.mkdir('files/')
     np.save('files/' + str(args.size) + 'datasubselections.npy', dataset)
+
 
 if __name__ == '__main__':
     main()
