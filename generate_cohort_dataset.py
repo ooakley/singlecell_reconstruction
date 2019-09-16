@@ -2,10 +2,9 @@
 Generate subselections of RNAseq data,
 convert to numpy and save locally to files.
 
-Generate 50 section bins of avgTomoSeq data.
 
 Example:
-python generate_cohort_dataset.py 20
+python generate_cohort_dataset.py 500
 """
 import os
 import random
@@ -25,7 +24,7 @@ def main():
     random.seed(10)
 
     # Importing data:
-    sc_array = np.load('files/normalised48counts.npy')
+    sc_array = np.load('files/norm/norm_subset.npy')
 
     # Generating subselections:
     dataset = []
@@ -39,7 +38,7 @@ def main():
     # Saving to file:
     if not os.path.exists('files/'):
         os.mkdir('files/')
-    np.save('files/' + str(args.size) + 'datasubselections.npy', dataset)
+    np.save('files/norm/' + str(args.size) + 'datasubselections.npy', dataset)
 
 
 if __name__ == '__main__':
