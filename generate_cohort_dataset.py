@@ -4,7 +4,7 @@ convert to numpy and save locally to files.
 
 
 Example:
-python generate_cohort_dataset.py 500
+python generate_cohort_dataset.py 50 True
 """
 import os
 import random
@@ -17,6 +17,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='Script to generate population subselections dataset.')
     parser.add_argument('size', type=int, help='Size of resultant dataset.')
+    parser.add_argument('all', type=bool, help='Whether to include all genes.')
     args = parser.parse_args()
 
     # Seeding for reproducibility:
@@ -24,7 +25,10 @@ def main():
     random.seed(10)
 
     # Importing data:
-    sc_array = np.load('files/norm/norm_subset.npy')
+    if all:
+        sc_array = np.load('files/norm/norm_all.npy')
+    else:
+        sc_array = np.load('files/norm/norm_subset.npy')
 
     # Generating subselections:
     dataset = []
@@ -38,7 +42,16 @@ def main():
     # Saving to file:
     if not os.path.exists('files/'):
         os.mkdir('files/')
-    np.save('files/norm/' + str(args.size) + 'datasubselections.npy', dataset)
+    if all:
+        np.save(
+            'files/norm/' + str(args.size) + 'alldatasubselections.npy',
+            dataset
+            )
+    else:
+        np.save(
+            'files/norm/' + str(args.size) + 'landmarkdatasubselections.npy',
+            dataset
+            )
 
 
 if __name__ == '__main__':
