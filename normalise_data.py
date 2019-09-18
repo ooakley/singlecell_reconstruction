@@ -35,16 +35,15 @@ def main():
     # Importing data:
     landmark_seq = np.load('files/48seqcounts.npy')
     print('lmseq shape: ' + str(landmark_seq.shape))
-
-    # TODO: all gene normalisation
-    # all_seq = np.load('files/allseqcounts.npy')
+    all_seq = np.load('files/allseqcounts.npy')
+    print('all_seq shape: ' + str(all_seq.shape))
 
     # Normalising landmark data:
     params = calculate_normparameters(landmark_seq)
     norm_lmseq = apply_normparameters(landmark_seq, *params)
 
-    # norm_all = apply_normparameters(all_seq, params)
-    # print('All genes: ' + str(norm_all.shape))
+    params = calculate_normparameters(all_seq)
+    norm_all = apply_normparameters(all_seq, *params)
 
     # Saving datasets:
     sns.heatmap(norm_lmseq)
@@ -52,7 +51,7 @@ def main():
     if not os.path.exists('files/norm/'):
         os.mkdir('files/norm/')
     np.save('files/norm/norm_lmseq.npy', norm_lmseq)
-    # np.save('files/norm/norm_all.npy', norm_all)
+    np.save('files/norm/norm_allseq.npy', norm_all)
 
 
 if __name__ == '__main__':

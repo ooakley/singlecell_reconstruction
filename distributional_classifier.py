@@ -17,22 +17,17 @@ class DistClassifier(nn.Module):
     Class to encapsulate methods and architecture of
     distributional classifier neural net.
     """
-    def __init__(self, learning_rate, dropout_rate, tomo):
+    def __init__(self, learning_rate, dropout_rate, tomo, numgene):
         super().__init__()
         self.learning_rate = learning_rate
         self.dropout_rate = dropout_rate
-        self.lin1 = nn.Linear(48, 49)
+        self.lin1 = nn.Linear(numgene, (numgene+50)//2)
         self.dropout1 = nn.Dropout(self.dropout_rate)
-        self.lin2 = nn.Linear(49, 50)
+        self.lin2 = nn.Linear((numgene+50)//2, 50)
         self.sm = nn.Softmax(1)
         mean = tomo.mean(1, keepdim=True)
-        self.scaled_tomo_map = (tomo-mean)
-        sns.heatmap(tomo)
-        plt.show()
-        plt.clf()
-        sns.heatmap(self.scaled_tomo_map)
-        plt.show()
-        plt.clf()
+        std = tomo.std(1, keepdim=True)
+        self.scaled_tomo_map = (tomo-mean)/std
 
     def split_cell(self, norm):
         net_out = self.lin2(self.dropout1(self.lin1(norm)))
@@ -48,7 +43,8 @@ class DistClassifier(nn.Module):
 
     def calculate_loss(self, loss_func):
         mean = self.alt_map.mean(1, keepdim=True)
-        norm_map = (self.alt_map-mean)
+        std = self.alt_map.std(1, keepdim=True)
+        norm_map = (self.alt_map-mean)/std
         self.loss = loss_func(norm_map, self.scaled_tomo_map)
 
     def backward(self):
@@ -72,7 +68,7 @@ class DistClassifier(nn.Module):
 def fit(norm, raw, model, loss_func, loss_list):
     for i in range(norm.shape[0]):
         # Generating map:
-        if i % 100 == 0:
+        if i % 500 == 0:
             model.generate_distribution(norm, raw)
 
         # Backprop:
@@ -82,7 +78,7 @@ def fit(norm, raw, model, loss_func, loss_list):
         loss_list.append(model.loss.item())
 
         #  Readout:
-        if i % 100 == 0:
+        if i % 500 == 0:
             print('>>>> Epoch: ' + str(i))
             print('>>>> Loss: ' + str(model.loss.item()))
             plt.ion()
@@ -97,23 +93,22 @@ def main():
     Import data, fit model, visualise model,
     save trained model weights.
     """
-    EPOCHS = 1
+    EPOCHS = 2
     # Importing data:
     print('Loading data...')
     lmtomo = np.load('files/fiftybintomoseq.npy')  # (48, 50)
-    normseq = np.load('files/norm/norm_lmseq.npy')  # (6189, 48)
+    normseq = np.load('files/allseqcounts.npy')[:, 0:1000]  # (6189, 23946)
     rawseq = np.load('files/48seqcounts.npy')
-    # all_array = np.load('files/norm/norm_all.npy')
 
     # Converting to torch tensors:
     print('Converting numpy arrays to torch tensors...')
     tomo_tensor = torch.from_numpy(lmtomo)
     norm_tensor = torch.from_numpy(normseq)
     raw_tensor = torch.from_numpy(rawseq)
-    # all_tensor = torch.from_numpy(all_array)[:, 0:500]
 
     # Training model:
-    dist_classifier = DistClassifier(0.0001, 0.1, tomo_tensor)
+    dist_classifier = DistClassifier(
+        0.1, 0.1, tomo_tensor, normseq.shape[1])
     loss_func = nn.MSELoss(reduction='mean')
 
     # Fitting model:
@@ -123,11 +118,6 @@ def main():
         fit(norm_tensor, raw_tensor, dist_classifier, loss_func, loss_list)
 
     # Saving model output:
-    plt.ioff()
-    plt.clf()
-    sns.heatmap(dist_classifier.generated_map)
-    plt.show()
-
     model_predictions = []
     with torch.no_grad():
         for i in range(norm_tensor.shape[0]):

@@ -49,30 +49,39 @@ def main():
     # Calculating scores:
     RCCcorr_array = []
     pseudocorr_array = []
-    for i in range(50):
-        correlation, _ = spearmanr(RCC_assembled[:, i], tomoseq_dataset[:, i])
+    for i in range(48):
+        correlation, _ = spearmanr(RCC_assembled[i, :], tomoseq_dataset[i, :])
         RCCcorr_array.append(correlation)
-    for i in range(50):
+    for i in range(48):
         correlation, _ = spearmanr(
-            pseudoRCC_assembled[:, i], tomoseq_dataset[:, i]
+            pseudoRCC_assembled[i, :], tomoseq_dataset[i, :]
             )
         if np.isnan(correlation):
             continue
         pseudocorr_array.append(correlation)
 
-    RCCscore = np.mean(np.asarray(RCCcorr_array))
+    RCCscore = np.median(np.asarray(RCCcorr_array))
     pseudoRCCscore = np.median(np.asarray(pseudocorr_array))
     print('RCC score: ' + str(RCCscore))
     print('PseudoRCC score: ' + str(pseudoRCCscore))
-
-    # for i in range(tomoseq_dataset.shape[0]):
-    #
 
     # Plotting values:
     if not os.path.exists('files/reconstruction_images/'):
         os.mkdir('files/reconstruction_images/')
     if not os.path.exists('files/reconstruction_plots/'):
         os.mkdir('files/reconstruction_plots/')
+
+    for i in range(48):
+        fig, axs = plt.subplots(3, sharex=True, figsize=(8, 4))
+        fig.suptitle('Distributions of gene')
+        axs[0].plot(tomoseq_dataset[i, :])
+        axs[1].plot(RCC_assembled[i, :])
+        axs[2].plot(pseudoRCC_assembled[i, :])
+        axs[2].set(xlabel='A/P axis')
+        fig.text(0.04, 0.5, 'Arbitrary expression',
+                 va='center', rotation='vertical')
+        plt.savefig('files/reconstruction_plots/gene' + str(i))
+        plt.close()
 
     _ = sns.heatmap(
         tomoseq_dataset-tomoseq_dataset.mean(axis=1, keepdims=True))
