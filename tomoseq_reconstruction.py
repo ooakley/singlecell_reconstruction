@@ -21,7 +21,6 @@ def main():
 
     # Import data:
     sc_dataset = np.load('files/48seqcounts.npy')
-    all_dataset = np.load('files/allseqcounts.npy')
     RCC = np.load('files/RCClandmarkvalues.npy')
     tomoseq_dataset = np.load('files/fiftybintomoseq.npy')
     pseudoRCC = np.load('files/predictions/distclassifier_predictions.npy')
@@ -66,26 +65,31 @@ def main():
     print('RCC score: ' + str(RCCscore))
     print('PseudoRCC score: ' + str(pseudoRCCscore))
 
+    # for i in range(tomoseq_dataset.shape[0]):
+    #
+
     # Plotting values:
     if not os.path.exists('files/reconstruction_images/'):
         os.mkdir('files/reconstruction_images/')
+    if not os.path.exists('files/reconstruction_plots/'):
+        os.mkdir('files/reconstruction_plots/')
 
-    _ = sns.heatmap(tomoseq_dataset)
+    _ = sns.heatmap(
+        tomoseq_dataset-tomoseq_dataset.mean(axis=1, keepdims=True))
     plt.savefig('files/reconstruction_images/tomoseq_heatmap.png',
                 dpi=300, orientation='portrait')
-    plt.show()
     plt.clf()
 
-    _ = sns.heatmap(RCC_assembled)
+    _ = sns.heatmap(
+        RCC_assembled-RCC_assembled.mean(axis=1, keepdims=True))
     plt.savefig('files/reconstruction_images/RCC_heatmap.png',
                 dpi=300, orientation='portrait')
-    plt.show()
     plt.clf()
 
-    _ = sns.heatmap(pseudoRCC_assembled)
+    _ = sns.heatmap(
+        pseudoRCC_assembled-pseudoRCC_assembled.mean(axis=1, keepdims=True))
     plt.savefig('files/reconstruction_images/pseudoRCC_heatmap.png',
                 dpi=300, orientation='portrait')
-    plt.show()
     plt.clf()
 
 
