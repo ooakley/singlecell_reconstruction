@@ -23,7 +23,8 @@ def main():
     sc_dataset = np.load('files/48seqcounts.npy')
     RCC = np.load('files/RCClandmarkvalues.npy')
     tomoseq_dataset = np.load('files/fiftybintomoseq.npy')
-    pseudoRCC = np.load('files/predictions/distclassifier_predictions.npy')
+    pseudoRCC = np.load(
+        'files/predictions/dist_predictions_2019-09-19 17:08.npy')
 
     # Generating assignment matrix:
     RCC_assignment = RCC.argmax(axis=1)

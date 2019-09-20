@@ -4,12 +4,12 @@ Script to define and train a distributional classifier with pytorch.
 Example:
 python distributional_classifier.py
 """
+from datetime import datetime
 import numpy as np
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import os
-import seaborn as sns
 
 
 class DistClassifier(nn.Module):
@@ -21,31 +21,32 @@ class DistClassifier(nn.Module):
         super().__init__()
         self.learning_rate = learning_rate
         self.dropout_rate = dropout_rate
-        self.lin1 = nn.Linear(numgene, (numgene+50)//2)
-        self.dropout1 = nn.Dropout(self.dropout_rate)
-        self.lin2 = nn.Linear((numgene+50)//2, 50)
+        self.dropout = nn.Dropout(self.dropout_rate)
+        self.lin1 = nn.Linear(numgene, 2000)
+        self.lin2 = nn.Linear(2000, 50)
         self.sm = nn.Softmax(1)
+        self.lsm = nn.LogSoftmax(1)
         mean = tomo.mean(1, keepdim=True)
         std = tomo.std(1, keepdim=True)
-        self.scaled_tomo_map = (tomo-mean)/std
+        self.scaled_tomo_map = self.sm((tomo-mean)/std)
 
     def split_cell(self, norm):
-        net_out = self.lin2(self.dropout1(self.lin1(norm)))
+        net_out = self.lin2(self.dropout(self.lin1(norm)))
         classifier_output = self.sm(torch.unsqueeze(net_out, 0))
         return classifier_output
 
     def forward(self, norm, raw):
-        split_dist = torch.mm(
-            torch.unsqueeze(raw, 1),
-            self.split_cell(norm)
-            )
+        split = self.split_cell(norm)
+        split_dist = torch.mm(torch.unsqueeze(raw, 1), split)
         self.alt_map = self.generated_map + split_dist
+        self.entropy = -torch.sum(split * split.log())
 
     def calculate_loss(self, loss_func):
         mean = self.alt_map.mean(1, keepdim=True)
         std = self.alt_map.std(1, keepdim=True)
-        norm_map = (self.alt_map-mean)/std
-        self.loss = loss_func(norm_map, self.scaled_tomo_map)
+        norm_map = self.lsm((self.alt_map-mean)/std)
+        self.loss = loss_func(
+            norm_map, self.scaled_tomo_map) + 1e-6*self.entropy
 
     def backward(self):
         self.loss.backward()
@@ -65,7 +66,7 @@ class DistClassifier(nn.Module):
                 self.generated_map += split_dist
 
 
-def fit(norm, raw, model, loss_func, loss_list):
+def fit(norm, raw, model, loss_func, loss_list, j):
     for i in range(norm.shape[0]):
         # Generating map:
         if i % 500 == 0:
@@ -79,7 +80,7 @@ def fit(norm, raw, model, loss_func, loss_list):
 
         #  Readout:
         if i % 500 == 0:
-            print('>>>> Epoch: ' + str(i))
+            print('>>>> Epoch: ' + str(j))
             print('>>>> Loss: ' + str(model.loss.item()))
             plt.ion()
             plt.clf()
@@ -93,11 +94,16 @@ def main():
     Import data, fit model, visualise model,
     save trained model weights.
     """
-    EPOCHS = 2
+    EPOCHS = 20
+    timestamp = datetime.today()
+    timestamp = str(timestamp)[0:16]
+    torch.manual_seed(0)
+    np.random.seed(0)
+
     # Importing data:
     print('Loading data...')
     lmtomo = np.load('files/fiftybintomoseq.npy')  # (48, 50)
-    normseq = np.load('files/allseqcounts.npy')[:, 0:1000]  # (6189, 23946)
+    normseq = np.load('files/norm/norm_varseq.npy')[:, 0:500]
     rawseq = np.load('files/48seqcounts.npy')
 
     # Converting to torch tensors:
@@ -106,18 +112,31 @@ def main():
     norm_tensor = torch.from_numpy(normseq)
     raw_tensor = torch.from_numpy(rawseq)
 
-    # Training model:
+    # Instantiating model:
     dist_classifier = DistClassifier(
         0.1, 0.1, tomo_tensor, normseq.shape[1])
-    loss_func = nn.MSELoss(reduction='mean')
+    loss_func = nn.KLDivLoss(reduction='batchmean')
 
     # Fitting model:
     print('Fitting model...')
     loss_list = []
     for j in range(EPOCHS):
-        fit(norm_tensor, raw_tensor, dist_classifier, loss_func, loss_list)
+        fit(norm_tensor, raw_tensor, dist_classifier, loss_func, loss_list, j)
+        rng_state = np.random.get_state()
+        np.random.shuffle(norm_tensor)
+        np.random.set_state(rng_state)
+        np.random.shuffle(raw_tensor)
 
-    # Saving model output:
+    # Saving loss history:
+    plt.ioff()
+    fig, ax = plt.subplots()
+    ax.plot(np.stack(loss_list))
+    ax.set_title('Training loss')
+    if not os.path.exists('files/training_plots/'):
+        os.mkdir('files/training_plots/')
+    plt.savefig('files/training_plots/' + timestamp)
+
+    # Saving model predictions:
     model_predictions = []
     with torch.no_grad():
         for i in range(norm_tensor.shape[0]):
@@ -128,7 +147,7 @@ def main():
     print(model_predictions.shape)
     if not os.path.exists('files/predictions/'):
         os.mkdir('files/predictions/')
-    np.save('files/predictions/distclassifier_predictions.npy',
+    np.save('files/predictions/dist_predictions_' + timestamp + '.npy',
             model_predictions)
 
 

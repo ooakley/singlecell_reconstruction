@@ -19,10 +19,8 @@ def apply_normparameters(dataset, mean, std, max, min):
 def calculate_normparameters(dataset):
     mean = np.mean(dataset, axis=0)
     mean = np.expand_dims(mean, axis=0)
-    print(mean.shape)
     std = np.std(dataset, axis=0)
     std = np.expand_dims(std, axis=0)
-    print(std.shape)
     normalised_dataset = (dataset - mean)/std
     max = np.max(normalised_dataset, axis=0)
     max = np.expand_dims(max, axis=0)
@@ -37,21 +35,27 @@ def main():
     print('lmseq shape: ' + str(landmark_seq.shape))
     all_seq = np.load('files/allseqcounts.npy')
     print('all_seq shape: ' + str(all_seq.shape))
+    var_seq = np.load('files/variable_dataset.npy')
+    print('var_seq shape: ' + str(var_seq.shape))
 
     # Normalising landmark data:
     params = calculate_normparameters(landmark_seq)
-    norm_lmseq = apply_normparameters(landmark_seq, *params)
+    norm_lm = apply_normparameters(landmark_seq, *params)
 
     params = calculate_normparameters(all_seq)
     norm_all = apply_normparameters(all_seq, *params)
 
+    params = calculate_normparameters(var_seq)
+    norm_var = apply_normparameters(var_seq, *params)
+
     # Saving datasets:
-    sns.heatmap(norm_lmseq)
+    sns.heatmap(norm_var)
     plt.show()
     if not os.path.exists('files/norm/'):
         os.mkdir('files/norm/')
-    np.save('files/norm/norm_lmseq.npy', norm_lmseq)
+    np.save('files/norm/norm_lmseq.npy', norm_lm)
     np.save('files/norm/norm_allseq.npy', norm_all)
+    np.save('files/norm/norm_varseq.npy', norm_var)
 
 
 if __name__ == '__main__':
