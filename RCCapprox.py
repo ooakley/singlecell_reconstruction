@@ -22,11 +22,7 @@ def define_model():
     model = Sequential()
     rate = 0.1
 
-    model.add(Dense(50, input_dim=16383, activation='relu'))
-    model.add(Dropout(rate, noise_shape=None, seed=None))
-    model.add(BatchNormalization())
-
-    model.add(Dense(10))
+    model.add(Dense(300, input_dim=100, activation='relu'))
     model.add(Dropout(rate, noise_shape=None, seed=None))
     model.add(BatchNormalization())
 
@@ -58,7 +54,7 @@ def main():
     K.set_session(sess)
 
     # Import data:
-    sc_dataset = np.load('files/allseqcounts.npy')
+    sc_dataset = np.load('files/norm/norm_varseq.npy')[:, 0:100]
     RCC_dataset = np.load('files/RCClandmarkvalues.npy')
 
     # Define model:

@@ -36,19 +36,46 @@ def main():
     all_array = np.transpose(all_array)
     print(all_array.shape)  # (6189, 23946)
 
-    # Importing tomoSeq data and converting to numpy array:
+    # Importing landmark tomoSeq data and converting to numpy array:
     tomo_array = pandas.read_csv(
         'files/raw/embryo_average_landmark_genes_landmarkEbar.csv')
     tomo_array = tomo_array.loc[:, '1':]
     tomo_array = tomo_array.to_numpy(dtype='float32', copy=True)
 
+    # Importing sym to ensembl lookup table:
+    sym_ensembl = pandas.read_csv(
+        'files/raw/varGenes_symtoEnsembl.csv').iloc[:, 1:]
+    sym_ensembl.columns = sym_ensembl.columns.str.strip(
+        ).str.lower().str.replace(' ', '_')
+    sym_ensembl.dropna(inplace=True)
+    sym_ensembl.to_csv(path_or_buf='files/sym_ensembl.csv')
+
+    # Generating list of shared genes:
+    all_tomo = pandas.read_csv('files/raw/tomo_average.eucl.csv', index_col=0)
+    tomo_list = list(all_tomo.index.values)
+    sym_ensembl = sym_ensembl.set_index(
+        'ensemblid', drop=False).loc[tomo_list, :]
+    sym_ensembl.dropna(inplace=True)
+
+    # Extracting shared genes
+    var_list = sym_ensembl.loc[:, 'ensemblid'].values.tolist()
+    var_tomo = all_tomo.loc[var_list, :]
+    var_tomo.sort_index(inplace=True)
+    var_tomo.to_csv(path_or_buf='files/vartomo.csv')
+    var_tomo = var_tomo.to_numpy(dtype='float32', copy=True)
+
     # Importing spatially variable list of genes into pandas:
-    var_pandas = pandas.read_csv('files/raw/top3000variablegenes_18hpf.csv')
-    var_list = var_pandas['genes'].values.tolist()
-    variable_dataset = all_pandas.loc[var_list, :]
-    variable_dataset = variable_dataset.to_numpy(dtype='float32', copy=True)
-    variable_dataset = np.transpose(variable_dataset)
-    print(variable_dataset.shape)
+    var_list = sym_ensembl.loc[:, 'genesymbol'].values.tolist()[0:500]
+    var_seq = all_pandas.loc[var_list, :]
+    lookup_dict = sym_ensembl.set_index('genesymbol').T.to_dict(
+        orient='list')
+    print(lookup_dict)
+    var_seq.rename(index=lookup_dict, inplace=True)
+    var_seq.sort_index(inplace=True, axis=0)
+    var_seq.to_csv(path_or_buf='files/varseq.csv')
+    var_seq = var_seq.to_numpy(dtype='float32', copy=True)
+    var_seq = np.transpose(var_seq)
+    print(var_seq.shape)
 
     # Saving to file:
     if not os.path.exists('files/'):
@@ -56,7 +83,8 @@ def main():
     np.save('files/48seqcounts.npy', sc_array)
     np.save('files/avgtomodata.npy', tomo_array)
     np.save('files/allseqcounts.npy', all_array)
-    np.save('files/variable_dataset.npy', variable_dataset)
+    np.save('files/variable_dataset.npy', var_seq)
+    np.save('files/variable_tomo.npy', var_tomo)
 
 
 if __name__ == '__main__':

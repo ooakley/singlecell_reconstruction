@@ -37,8 +37,8 @@ def main():
     for i in range(sc_data.shape[0]):
         sc_instance = np.squeeze(sc_data[i, :])
         rcc_instance = []
-        for j in range(50):
-            rcc, _ = spearmanr(sc_instance, fifty_section_data[:, j])
+        for j in range(100):
+            rcc, _ = spearmanr(sc_instance, tomo_data[:, j])
             rcc_instance.append(rcc)
         rcc_instance = np.asarray(rcc_instance)
         rcc_matrix.append(rcc_instance)
