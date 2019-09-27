@@ -24,9 +24,10 @@ class section_classifier(nn.Module):
         # Internal tensors and functions:
         self.dropout = nn.Dropout(0.1)
         self.relu = nn.LeakyReLU(inplace=False)
-        self.lin1 = nn.Linear(numgene, 10)
-        self.lin2 = nn.Linear(10, 1)
-        self.sm = nn.Softmax(1)
+        self.lin1 = nn.Linear(numgene, 75)
+        self.lin2 = nn.Linear(75, 1)
+        self.sm = nn.Softmax(0)
+        self.sig = nn.Sigmoid()
         self.loss_func = nn.MSELoss(reduction='mean')
 
     def init_state_variables(self):
@@ -35,7 +36,8 @@ class section_classifier(nn.Module):
         self.proportion_counter = torch.zeros(1)
 
     def forward(self, input, raw):
-        self.value = self.lin2(self.dropout(self.relu(self.lin1(input))))
+        self.value = self.sig(
+            self.lin2(self.dropout(self.relu(self.lin1(input)))))
         dist = torch.unsqueeze(raw, 1) * self.value
         alt = self.aggregate_selections + dist
         self.norm_alt = alt/(self.proportion_counter + 1e-20)
@@ -50,7 +52,8 @@ class section_classifier(nn.Module):
             self.proportion_counter += self.value
 
     def calculate_loss(self):
-        self.loss = self.loss_func(self.norm_alt, self.section)
+        self.loss = self.loss_func(
+            self.sm(self.norm_alt), self.sm(self.section))
 
     def backward(self):
         torch.autograd.set_detect_anomaly(True)
@@ -82,9 +85,18 @@ def fit(model_list, epochs, norm, raw):
     return loss_list
 
 
+def calculate_correlation(assembled, tomoseq):
+    corr_array = []
+    for i in range(48):
+        correlation, _ = spearmanr(assembled[i, :], tomoseq.numpy()[i, :])
+        corr_array.append(correlation)
+    mean_corr = np.mean(np.asarray(corr_array))
+    return mean_corr
+
+
 def main():
     """Train model."""
-    epochs = 10
+    epochs = 200
     timestamp = datetime.today()
     timestamp = str(timestamp)[0:16]
     torch.manual_seed(0)
@@ -92,9 +104,9 @@ def main():
 
     # Importing data:
     print('Loading data...')
-    lmtomo = np.load('files/norm/smooth_lmtomo.npy')[0:48, 0:100]  # (48, 100)
-    normseq = np.load('files/norm/norm_varseq.npy')[0:100, 0:100]
-    rawseq = np.load('files/48seqcounts.npy')[0:2000, 0:48]
+    lmtomo = np.load('files/norm/smooth_fiftytomo.npy')[0:48, :]  # (48, 50)
+    normseq = np.load('files/norm/norm_varseq.npy')[:, 0:500]
+    rawseq = np.load('files/48seqcounts.npy')[:, 0:48]
 
     # Converting to torch tensors:
     print('Converting numpy arrays to torch tensors...')
@@ -105,9 +117,8 @@ def main():
     # Instantiate model collection:
     print('Instantiating collection of models...')
     model_list = []
-    dropout_rate = 0.1
-    learning_rate = 0.001
-
+    dropout_rate = 0.3
+    learning_rate = 0.5
     numgene = normseq.shape[1]
     for i in range(lmtomo.shape[1]):
         section = tomo_tensor[:, i]
@@ -124,14 +135,36 @@ def main():
     plt.plot(np.asarray(loss_list))
     plt.savefig('files/training_plots/100models ' + timestamp)
     plt.close()
+
+    # Reconstructing tomoseq data:
     reconstructed_tomoseq = []
     for i in range(len(model_list)):
         section = model_list[i].aggregate_selections
         proportion = model_list[i].proportion_counter
+        print(proportion.item())
         reconstructed_tomoseq.append((section/proportion).numpy())
     reconstructed_tomoseq = np.concatenate(reconstructed_tomoseq, 1)
+    mean = np.expand_dims(reconstructed_tomoseq.mean(1), 1)
+    std = np.expand_dims(reconstructed_tomoseq.std(1), 1)
+    reconstructed_tomoseq = (reconstructed_tomoseq-mean)/std
     sns.heatmap(reconstructed_tomoseq)
     plt.savefig('files/final_maps/' + timestamp + ' 100model')
+    plt.close()
+
+    # Plotting comparison heatmap:
+    sns.heatmap(lmtomo)
+    plt.savefig('files/final_maps/tomo')
+    plt.close()
+
+    # Saving model:
+    filepath = 'files/models/100/'
+    if not os.path.exists(filepath):
+        os.mkdir(filepath)
+    for i in range(len(model_list)):
+        torch.save(model_list[i].state_dict(), filepath + str(i))
+
+    # Calculate correlation
+    # print(calculate_correlation(reconstructed_tomoseq, tomo_tensor))
 
 
 if __name__ == '__main__':

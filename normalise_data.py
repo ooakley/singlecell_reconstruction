@@ -38,14 +38,20 @@ def main():
     landmark_seq = np.load('files/48seqcounts.npy')
     print('lmseq shape: ' + str(landmark_seq.shape))
     print(landmark_seq.max())
+
     all_seq = np.load('files/allseqcounts.npy')
     print('all_seq shape: ' + str(all_seq.shape))
     print(all_seq.max())
+
     var_seq = np.load('files/variable_dataset.npy')
     print('var_seq shape: ' + str(var_seq.shape))
     print(var_seq.max())
+
     lm_tomo = np.load('files/avgtomodata.npy')
     print('lmtomo shape: ' + str(lm_tomo.shape))
+
+    fifty_tomo = np.load('files/fiftybintomoseq.npy')
+    print('fiftytomo shape: ' + str(fifty_tomo.shape))
 
     # Normalising landmark data:
     params = calculate_normparameters(landmark_seq)
@@ -59,6 +65,7 @@ def main():
 
     # Smoothing tomoseq data:
     smooth_tomo = savgol_filter(lm_tomo, window_length=11, polyorder=2)
+    smooth_fiftytomo = savgol_filter(fifty_tomo, window_length=5, polyorder=2)
 
     # Saving datasets:
     sns.heatmap(norm_var)
@@ -71,6 +78,7 @@ def main():
     np.save('files/norm/norm_allseq.npy', norm_all)
     np.save('files/norm/norm_varseq.npy', norm_var)
     np.save('files/norm/smooth_lmtomo', smooth_tomo)
+    np.save('files/norm/smooth_fiftytomo', smooth_fiftytomo)
 
 
 if __name__ == '__main__':

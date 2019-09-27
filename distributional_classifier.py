@@ -25,8 +25,8 @@ class DistClassifier(nn.Module):
         self.dropout_rate = dropout_rate
         self.dropout = nn.Dropout(self.dropout_rate)
         self.relu = nn.LeakyReLU(inplace=False)
-        self.lin1 = nn.Linear(numgene, 1500)
-        self.lin2 = nn.Linear(1500, 100)
+        self.lin1 = nn.Linear(numgene, 500)
+        self.lin2 = nn.Linear(500, 100)
         self.sm = nn.Softmax(1)
         self.lsm = nn.LogSoftmax(1)
         mean = tomo.mean(1, keepdim=True)
@@ -37,7 +37,9 @@ class DistClassifier(nn.Module):
         # self.norm_tomo = (self.norm_tomo - tomo_min)/(tomo_max - tomo_min)
 
     def split_cell(self, norm):
-        net_out = self.lin2(self.dropout(self.relu(self.lin1(norm))))
+        lin1out = self.dropout(self.relu(self.lin1(norm)))
+        lin2out = self.lin2(lin1out)
+        net_out = lin2out
         classifier_output = self.sm(torch.unsqueeze(net_out, 0))
         return classifier_output
 
@@ -46,21 +48,22 @@ class DistClassifier(nn.Module):
         split_dist = torch.mm(torch.unsqueeze(raw, 1), split)
         self.alt_map = self.generated_map + split_dist
         self.alt_predmap = self.predictions_map + split
-        self.class_entropy = -torch.sum(split * split.log())
+        self.class_entropy = -torch.sum(split * (split+1e-20).log())
+        print(self.class_entropy.item())
 
     def calculate_loss(self, loss_func):
         self.alt_map = self.alt_map / self.alt_predmap
         gene_mean = self.alt_map.mean(1, keepdim=True)
-        gene_std = self.alt_map.std(1, keepdim=True)
-        self.norm_map = self.lsm((self.alt_map-gene_mean)/gene_std)
+        gene_std = (self.alt_map+1e-20).std(1, keepdim=True)
+        self.norm_map = self.sm((self.alt_map-gene_mean)/gene_std)
         sm_bins = self.sm(self.alt_predmap)
-        bin_entropy = -torch.sum(sm_bins * sm_bins.log())
+        bin_entropy = -torch.sum(sm_bins * (sm_bins+1e-20).log())
         # map_max = self.norm_map.max(1, keepdim=True)[0]
         # map_min = self.norm_map.min(1, keepdim=True)[0]
         # self.norm_map = (self.norm_map - map_min)/(map_max - map_min)
         self.loss = loss_func(
             self.norm_map, self.norm_tomo
-            ) + 0*self.class_entropy - 0.1*bin_entropy
+            ) + 0.1*(((2-self.class_entropy)**2)) - 0.5*bin_entropy
 
     def backward(self):
         self.loss.backward()
@@ -74,7 +77,7 @@ class DistClassifier(nn.Module):
         self.predictions_map = torch.zeros(1, 100)
         self.prediction_history = []
         with torch.no_grad():
-            for i in range(norm.shape[0]):
+            for i in range(200):
                 split_cell = self.split_cell(norm[i, :])
                 split_dist = torch.mm(
                     torch.unsqueeze(raw[i, :], 1), split_cell
@@ -105,9 +108,9 @@ def calculate_correlation(predictions, rawseq, tomoseq):
 
 
 def fit(model, loss_func, loss_list, corr_list, j, norm, raw, tomo):
-    for i in range(norm.shape[0]):
+    for i in range(5):
         # Generating map:
-        if i % 100 == 0:
+        if i % 500 == 0:
             model.generate_distribution(norm, raw)
             with torch.no_grad():
                 corr_list.append(
@@ -120,7 +123,7 @@ def fit(model, loss_func, loss_list, corr_list, j, norm, raw, tomo):
         loss_list.append(model.loss.item())
 
         #  Readout:
-        if i % 100 == 0:
+        if i % 500 == 0:
             print('>>>> Epoch: ' + str(j+1))
             print('>>>> Loss: ' + str(model.loss.item()))
             plt.ion()
@@ -137,7 +140,7 @@ def main():
     Import data, fit model, visualise model,
     save trained model weights.
     """
-    EPOCHS = 15
+    EPOCHS = 50
     timestamp = datetime.today()
     timestamp = str(timestamp)[0:16]
     torch.manual_seed(0)
@@ -157,20 +160,21 @@ def main():
 
     # Instantiating model:
     dist_classifier = DistClassifier(
-        1e-1, 0.5, tomo_tensor, normseq.shape[1])
-    loss_func = nn.KLDivLoss(reduction='batchmean')
+        0.1, 0.5, tomo_tensor, normseq.shape[1])
+    loss_func = nn.MSELoss(reduction='mean')
 
     # Fitting model:
     print('Fitting model...')
     loss_list = []
     corr_list = []
-    for j in range(EPOCHS):
-        tensors = (norm_tensor, raw_tensor, tomo_tensor)
-        fit(dist_classifier, loss_func, loss_list, corr_list, j, *tensors)
-        rng_state = np.random.get_state()
-        np.random.shuffle(norm_tensor)
-        np.random.set_state(rng_state)
-        np.random.shuffle(raw_tensor)
+    with torch.autograd.detect_anomaly():
+        for j in range(EPOCHS):
+            tensors = (norm_tensor, raw_tensor, tomo_tensor)
+            fit(dist_classifier, loss_func, loss_list, corr_list, j, *tensors)
+            rng_state = np.random.get_state()
+            np.random.shuffle(norm_tensor)
+            np.random.set_state(rng_state)
+            np.random.shuffle(raw_tensor)
 
     # Generating directories:
     if not os.path.exists('files/training_plots/'):
@@ -179,7 +183,7 @@ def main():
         os.mkdir('files/final_maps/')
 
     # Saving loss history:
-    plt.ioff()
+    # plt.ioff()
     plt.close()
     plt.clf()
     fig, axs = plt.subplots(2)
@@ -211,6 +215,7 @@ def main():
         os.mkdir('files/predictions/')
     np.save('files/predictions/dist_predictions_' + timestamp + '.npy',
             model_predictions)
+    print(dist_classifier.predictions_map)
 
 
 if __name__ == '__main__':
