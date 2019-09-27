@@ -31,7 +31,7 @@ class DistClassifier(nn.Module):
         self.lsm = nn.LogSoftmax(1)
         mean = tomo.mean(1, keepdim=True)
         std = tomo.std(1, keepdim=True)
-        self.norm_tomo = self.sm((tomo-mean)/std)
+        self.norm_tomo = (tomo-mean)/std
         # tomo_max = self.norm_tomo.max(1, keepdim=True)[0]
         # tomo_min = self. norm_tomo.min(1, keepdim=True)[0]
         # self.norm_tomo = (self.norm_tomo - tomo_min)/(tomo_max - tomo_min)
@@ -49,21 +49,23 @@ class DistClassifier(nn.Module):
         self.alt_map = self.generated_map + split_dist
         self.alt_predmap = self.predictions_map + split
         self.class_entropy = -torch.sum(split * (split+1e-20).log())
-        print(self.class_entropy.item())
 
     def calculate_loss(self, loss_func):
         self.alt_map = self.alt_map / self.alt_predmap
         gene_mean = self.alt_map.mean(1, keepdim=True)
         gene_std = (self.alt_map+1e-20).std(1, keepdim=True)
-        self.norm_map = self.sm((self.alt_map-gene_mean)/gene_std)
+        self.norm_map = (self.alt_map-gene_mean)/gene_std
         sm_bins = self.sm(self.alt_predmap)
         bin_entropy = -torch.sum(sm_bins * (sm_bins+1e-20).log())
+        print('bin:   ' + str(bin_entropy.item()))
+        print('class: ' + str(self.class_entropy.item()))
         # map_max = self.norm_map.max(1, keepdim=True)[0]
         # map_min = self.norm_map.min(1, keepdim=True)[0]
         # self.norm_map = (self.norm_map - map_min)/(map_max - map_min)
         self.loss = loss_func(
             self.norm_map, self.norm_tomo
-            ) + 0.1*(((2-self.class_entropy)**2)) - 0.5*bin_entropy
+            )
+        # + 0.001*(self.class_entropy) - 0.9*bin_entropy
 
     def backward(self):
         self.loss.backward()
@@ -108,7 +110,7 @@ def calculate_correlation(predictions, rawseq, tomoseq):
 
 
 def fit(model, loss_func, loss_list, corr_list, j, norm, raw, tomo):
-    for i in range(5):
+    for i in range(500):
         # Generating map:
         if i % 500 == 0:
             model.generate_distribution(norm, raw)
@@ -140,7 +142,7 @@ def main():
     Import data, fit model, visualise model,
     save trained model weights.
     """
-    EPOCHS = 50
+    EPOCHS = 1
     timestamp = datetime.today()
     timestamp = str(timestamp)[0:16]
     torch.manual_seed(0)
@@ -160,8 +162,8 @@ def main():
 
     # Instantiating model:
     dist_classifier = DistClassifier(
-        0.1, 0.5, tomo_tensor, normseq.shape[1])
-    loss_func = nn.MSELoss(reduction='mean')
+        1e-1, 0.5, tomo_tensor, normseq.shape[1])
+    loss_func = nn.MSELoss(reduction='sum')
 
     # Fitting model:
     print('Fitting model...')
@@ -181,6 +183,8 @@ def main():
         os.mkdir('files/training_plots/')
     if not os.path.exists('files/final_maps/'):
         os.mkdir('files/final_maps/')
+    if not os.path.exists('files/presentation_images/'):
+        os.mkdir('files/presentation_images/')
 
     # Saving loss history:
     # plt.ioff()
@@ -199,8 +203,13 @@ def main():
     sns.heatmap(dist_classifier.alt_map.detach().numpy())
     plt.savefig('files/final_maps/' + timestamp + 'raw')
     plt.close()
-    sns.heatmap(dist_classifier.norm_tomo)
-    plt.savefig('files/final_maps/tomo')
+
+    fig, ax = plt.subplots()
+    ax = sns.heatmap(dist_classifier.norm_tomo, cbar=False)
+    ax.set(xlabel='section number (A->P)', ylabel='gene',
+           title='Tomoseq data')
+    fig.savefig('files/presentation_images/norm_tomoseq.png')
+    plt.show()
 
     # Saving model predictions:
     model_predictions = []
